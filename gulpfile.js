@@ -22,14 +22,14 @@ gulp.task( 'styles', ['clean-styles'], function() {
 
     return gulp
         .src( config.less )
-        .pipe( $.plumber())
+        .pipe( $.plumber() )
         .pipe( $.less() )
         // .on('error', errorLogger)
         .pipe( $.autoprefixer( { browers: ['last 2 verstion', '> 5%'] } ) )
         .pipe( gulp.dest( config.temp ) );
 } );
 
-gulp.task( 'clean-styles', function( ) {
+gulp.task( 'clean-styles', function() {
     var files = config.temp + '**/*.css';
     return clean( files );
 } );
@@ -37,6 +37,28 @@ gulp.task( 'clean-styles', function( ) {
 gulp.task( 'less-watcher', function() {
     gulp.watch( [config.less], ['styles'] );
 } );
+
+gulp.task( 'wiredep', function() {
+    log( 'Wire up the bower css js and our app js into the html' );
+    var options = config.getWiredepDefaultOptions();
+    var wiredep = require( 'wiredep' ).stream;
+
+    return gulp
+        .src( config.index )
+        .pipe( wiredep( options ) )
+        .pipe( $.inject( gulp.src( config.js ) ) )
+        .pipe( gulp.dest( config.client ) );
+} );
+
+gulp.task( 'inject', ['wiredep', 'styles'], function() {
+    log( 'Wire up the app css and call wiredep' );
+
+    return gulp
+        .src( config.index )
+        .pipe( $.inject( gulp.src( config.css ) ) )
+        .pipe( gulp.dest( config.client ) );
+} );
+
 
 ///////////////
 function clean( path ) {
@@ -57,9 +79,9 @@ function log( msg ) {
     }
 }
 
-function errorLogger ( error ) {
-    log("*** Start of Error ***" );
-    log(error);
-    log("*** End of Error ***" );
-    this.emit('end');
+function errorLogger( error ) {
+    log( "*** Start of Error ***" );
+    log( error );
+    log( "*** End of Error ***" );
+    this.emit( 'end' );
 }
