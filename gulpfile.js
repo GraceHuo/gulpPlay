@@ -2,6 +2,7 @@ var gulp   = require( 'gulp' );
 var args   = require( 'yargs' ).argv;
 var config = require( './gulp.config' )();
 var del    = require( 'del' );
+var port   = process.env.PORT || config.defaultPort;
 
 var $ = require( 'gulp-load-plugins' )( { lazy: true } );
 
@@ -59,6 +60,34 @@ gulp.task( 'inject', ['wiredep', 'styles'], function() {
         .pipe( gulp.dest( config.client ) );
 } );
 
+gulp.task( 'serve-dev', ['inject'], function() {
+    var isDev = true;
+
+    var nodeOptions = {
+        script   : config.nodeServer,
+        delayTime: 1,
+        env      : {
+            'PORT'    : port,
+            'NODE_ENV': isDev ? "dev" : "build"
+        },
+        watch    : [config.server]
+    };
+
+    return $.nodemon( nodeOptions )
+        .on( 'restart', ['vet'], function( ev ) {
+            log( '*** nodemon restarted' );
+            log( 'files changed on restart:\n' + ev );
+        } )
+        .on( 'start', function() {
+            log( '*** nodemon started' );
+        } )
+        .on( 'crash', function() {
+            log( '*** nodemon crashed' );
+        } )
+        .on( 'exit', function() {
+            log( '*** nodemon exit' );
+        } );
+} );
 
 ///////////////
 function clean( path ) {
