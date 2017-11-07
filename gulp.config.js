@@ -31,7 +31,10 @@ module.exports = function() {
 
         // node settings
         defaultPort: 7203,
-        nodeServer : './src/server/app.js'
+        nodeServer : './src/server/app.js',
+
+        // browser sync
+        browserReloadDelay: 1000
     };
 
     config.getWiredepDefaultOptions = function() {
