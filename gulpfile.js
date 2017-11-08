@@ -68,6 +68,25 @@ gulp.task( 'clean-styles', function() {
     return clean( files );
 } );
 
+gulp.task( 'clean-code', function() {
+    var files = [].concat(
+        config.temp + '**/*.js',
+        config.build + '**/*.html',
+        config.build + 'js/**/*.js'
+    );
+    return clean( files );
+} );
+
+gulp.task( 'templatecache', ['clean-code'], function() {
+    log( "Creating AngularJS $TemplateCache" );
+
+    return gulp
+        .src( config.htmltemplates )
+        .pipe( $.minifyHtml( { empty: true } ) )
+        .pipe( $.angularTemplatecache( config.templateCache.file, config.templateCache.options ) )
+        .pipe( gulp.dest( config.temp ) );
+} );
+
 gulp.task( 'less-watcher', function() {
     gulp.watch( [config.less], ['styles'] );
 } );

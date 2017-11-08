@@ -6,24 +6,25 @@ module.exports = function() {
 
     var config = {
         // path
-        alljs : [
+        alljs        : [
             './src/**/*.js',
             './*.js'
         ],
-        build : './build/',
-        server: server,
-        client: client,
-        index : client + 'index.html',
-        css   : temp + "styles.css",
-        fonts : './bower_components/font-awesome/fonts/**/*.*',
-        images: client + 'images/**/*.*',
-        js    : [
+        build        : './build/',
+        server       : server,
+        client       : client,
+        index        : client + 'index.html',
+        css          : temp + "styles.css",
+        fonts        : './bower_components/font-awesome/fonts/**/*.*',
+        images       : client + 'images/**/*.*',
+        htmltemplates: clientApp + '**/*.html',
+        js           : [
             clientApp + '**/*.module.js',
             clientApp + '**/*.js',
             '!' + clientApp + '**/*.spec.js'
         ],
-        less  : client + '/styles/styles.less',
-        temp  : temp,
+        less         : client + '/styles/styles.less',
+        temp         : temp,
 
         // bower and npm locations
         bower: {
@@ -37,7 +38,17 @@ module.exports = function() {
         nodeServer : './src/server/app.js',
 
         // browser sync
-        browserReloadDelay: 1000
+        browserReloadDelay: 1000,
+
+        // template cache
+        templateCache: {
+            file   : 'templates.js',
+            options: {
+                module    : "app.core",
+                standAlone: false,
+                root      : 'app/'
+            }
+        }
     };
 
     config.getWiredepDefaultOptions = function() {
