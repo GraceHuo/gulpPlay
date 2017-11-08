@@ -124,6 +124,8 @@ gulp.task( 'optimize', ['inject'], function() {
             starttag: '<!-- inject:templates:js -->'
         } ) )
         .pipe( $.useref( { searchPath: './' } ) )
+        .pipe( $.if( '**/*.css', $.csso() ) )
+        .pipe( $.if( '**/*.js', $.uglify() ) )
         .pipe( gulp.dest( config.build ) );
 } );
 
