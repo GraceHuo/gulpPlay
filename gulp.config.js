@@ -3,9 +3,11 @@ module.exports = function() {
     var client    = './src/client/';
     var clientApp = client + 'app/';
     var temp      = './.tmp/';
+    var root      = './';
 
     var config = {
         // path
+        root         : root,
         alljs        : [
             './src/**/*.js',
             './*.js'
@@ -28,11 +30,15 @@ module.exports = function() {
         temp         : temp,
 
         // bower and npm locations
-        bower: {
+        bower   : {
             json      : require( './bower.json' ),
             directory : './bower_components/',
             ignorePath: '../..'
         },
+        packages: [
+            './package.json',
+            './bower.json'
+        ],
 
         // node settings
         defaultPort: 7203,
