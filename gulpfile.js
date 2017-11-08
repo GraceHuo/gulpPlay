@@ -5,6 +5,8 @@ var config      = require( './gulp.config' )();
 var del         = require( 'del' );
 var port        = process.env.PORT || config.defaultPort;
 var $           = require( 'gulp-load-plugins' )( { lazy: true } );
+var path        = require( 'path' );
+var _           = require( 'lodash' );
 
 gulp.task( 'help1', $.taskListing );
 gulp.task( 'default', ['help1'] );
@@ -78,7 +80,7 @@ gulp.task( 'clean-code', function() {
 } );
 
 gulp.task( 'templatecache', ['clean-code'], function() {
-    log( "Creating AngularJS $TemplateCache" );
+    log( 'Creating AngularJS $TemplateCache' );
 
     return gulp
         .src( config.htmltemplates )
@@ -112,7 +114,20 @@ gulp.task( 'inject', ['wiredep', 'styles', 'templatecache'], function() {
         .pipe( gulp.dest( config.client ) );
 } );
 
-gulp.task( 'optimize', ['inject'], function() {
+gulp.task( 'build', ['optimize', 'images', 'fonts'], function() {
+    log( 'Building everything' );
+
+    var msg = {
+        title   : 'gulp build',
+        subtitle: 'Deployed to the build folder',
+        message : 'Running `gulp serve-build`'
+    };
+    del( config.temp );
+    log( msg );
+    notify( msg );
+} );
+
+gulp.task( 'optimize', ['inject', 'test'], function() {
     log( 'Optimizing the javascript, css, html' );
 
     var templateCache = config.temp + config.templateCache.file;
@@ -127,15 +142,15 @@ gulp.task( 'optimize', ['inject'], function() {
         .pipe( $.if( '**/*.css', $.csso() ) )
         .pipe( $.if( '**/app.js', $.ngAnnotate() ) )
         .pipe( $.if( '**/*.js', $.uglify() ) )
-        .pipe( $.rev() ) // app.js -> app.hash.js
-        .pipe( $.revReplace() )
+        // .pipe( $.rev() ) // app.js -> app.hash.js
+        // .pipe( $.revReplace() )
         .pipe( gulp.dest( config.build ) )
         .pipe( $.rev.manifest() )
         .pipe( gulp.dest( config.build ) );
 
 } );
 
-gulp.task( 'serve-build', ['optimize'], function() {
+gulp.task( 'serve-build', ['build'], function() {
     serve( false /* isDev */ );
 } );
 
@@ -144,8 +159,7 @@ gulp.task( 'serve-dev', ['inject'], function() {
 } );
 
 gulp.task( 'bump', function() {
-    var msg = "Bumping versions";
-    console.log( "***", args );
+    var msg     = 'Bumping versions';
     var type    = args.type;
     var version = args.versions;
     var options = {};
@@ -165,14 +179,95 @@ gulp.task( 'bump', function() {
         .pipe( gulp.dest( config.root ) );
 } );
 
+gulp.task( 'test', ['vet', 'templatecache'], function( done ) {
+    startTests( true /* singleRun */, done );
+} );
+
+gulp.task( 'autotest', ['vet', 'templatecache'], function( done ) {
+    startTests( false /* singleRun */, done );
+} );
+
+gulp.task( 'build-specs', ['templatecache'], function() {
+    log( 'building the spec runner' );
+
+    var wiredep = require( 'wiredep' ).stream;
+    var options = config.getWiredepDefaultOptions();
+    var specs   = config.specs;
+
+    options.devDependencies = true;
+
+    if ( args.startServers ) {
+        specs = [].concat( specs, config.serverIntegrationSpecs );
+    }
+
+    return gulp
+        .src( config.specRunner )
+        .pipe( wiredep( options ) )
+        .pipe( $.inject( gulp.src( config.testlibraries ),
+            { name: 'inject:testlibraries' } ) )
+        .pipe( $.inject( gulp.src( config.js ) ) )
+        .pipe( $.inject( gulp.src( config.specHelpers ),
+            { name: 'inject:spechelpers' } ) )
+        .pipe( $.inject( gulp.src( specs ),
+            { name: 'inject:specs' } ) )
+        .pipe( $.inject( gulp.src( config.temp + config.templateCache.file ),
+            { name: 'inject:templates' } ) )
+        .pipe( gulp.dest( config.client ) );
+} );
+
+gulp.task( 'serve-specs', ['build-specs'], function( done ) {
+    log( 'run the spec runner' );
+    serve( true /* isDev */, true /* specRunner */ );
+    done();
+} );
+
 ///////////////
-function serve( isDev ) {
+function startTests( singleRun, done ) {
+    var child;
+    var fork         = require( 'child_process' ).fork;
+    var karma        = require( 'karma' ).server;
+    var excludeFiles = [];
+    var serverSpecs  = config.serverIntegrationSpecs;
+
+    if ( args.startServers ) { // gulp test --startServers
+        log( 'Starting server' );
+        var savedEnv      = process.env;
+        savedEnv.NODE_ENV = 'dev';
+        savedEnv.PORT     = 8888;
+        child             = fork( config.nodeServer );
+    } else {
+        if ( serverSpecs && serverSpecs.length ) {
+            excludeFiles = serverSpecs;
+        }
+    }
+
+    karma.start( {
+        configFile: __dirname + '/karma.conf.js',
+        exclude   : excludeFiles,
+        singleRun : !!singleRun
+    }, karmaCompleted );
+
+    function karmaCompleted( karmaResult ) {
+        log( 'Karma completed!' );
+        if ( child ) {
+            log( 'Shutting down the child process' );
+            child.kill();
+        }
+        if ( karmaResult === 1 ) {
+            done( 'karma: tests failed with code ' + karmaResult );
+        } else {
+            done();
+        }
+    }
+}
+
+function serve( isDev, specRunner ) {
     var nodeOptions = {
         script   : config.nodeServer,
         delayTime: 1,
         env      : {
             'PORT'    : port,
-            'NODE_ENV': isDev ? "dev" : "build"
+            'NODE_ENV': isDev ? 'dev' : 'build'
         },
         watch    : [config.server]
     };
@@ -188,7 +283,7 @@ function serve( isDev ) {
         } )
         .on( 'start', function() {
             log( '*** nodemon started' );
-            startBrowserSync( isDev );
+            startBrowserSync( isDev, specRunner );
         } )
         .on( 'crash', function() {
             log( '*** nodemon crashed' );
@@ -203,7 +298,7 @@ function changeEvent( event ) {
     log( 'File' + event.path.replace( srcPattern, '' ) + ' ' + event.type );
 }
 
-function startBrowserSync( isDev ) {
+function startBrowserSync( isDev, specRunner ) {
     if ( args.nosync || browserSync.active ) {
         return;
     }
@@ -243,6 +338,10 @@ function startBrowserSync( isDev ) {
         notify        : true,
         reloadDelay   : 1000
     };
+
+    if ( specRunner ) {
+        options.startPath = config.specRunner;
+    }
     browserSync( options );
 }
 
@@ -265,8 +364,19 @@ function log( msg ) {
 }
 
 function errorLogger( error ) {
-    log( "*** Start of Error ***" );
+    log( '*** Start of Error ***' );
     log( error );
-    log( "*** End of Error ***" );
+    log( '*** End of Error ***' );
     this.emit( 'end' );
+}
+
+function notify( options ) {
+    var notifier      = require( 'node-notifier' );
+    var notifyOptions = {
+        // sound       : 'Bottle',
+        contentImage: path.join( __dirname, 'gulp.png' ),
+        icon        : path.join( __dirname, 'gulp.png' )
+    };
+    _.assign( notifyOptions, options );
+    notifier.notify( notifyOptions );
 }
